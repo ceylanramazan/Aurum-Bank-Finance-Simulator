@@ -4,6 +4,7 @@ let workspace = Workspace(
     name: "AurumBank",
     projects: [
         "App",
+        "Modules/BankingDomain",
         "Modules/Core",
         "Modules/NetworkKit",
         "Modules/Storage",
