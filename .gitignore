@@ -18,6 +18,15 @@ Pods/
 .build/
 .swiftpm/
 
+# Tuist
+*.xcodeproj
+*.xcworkspace
+.tuist/
+Derived/
+Tuist/Dependencies/
+Tuist/.build/
+graph.png
+
 # macOS
 .DS_Store
 *.swp
