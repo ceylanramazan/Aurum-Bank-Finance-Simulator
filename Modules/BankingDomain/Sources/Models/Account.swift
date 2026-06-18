@@ -1,8 +1,8 @@
 import Foundation
 
 /// A bank account owned by a `User`.
-/// `balance` is read-only from outside this module — only `MockBankingService` mutates it,
-/// and only after `transfer` has already validated the operation.
+/// `balance` has no public setter — a new balance means a new `Account` value (see
+/// `AccountStore.transferBalance`), there's no in-place mutation to bypass.
 public struct Account: Identifiable, Sendable {
 
     // MARK: - Properties
@@ -19,11 +19,5 @@ public struct Account: Identifiable, Sendable {
         self.userId = userId
         self.iban = iban
         self.balance = balance
-    }
-
-    // MARK: - Internal Mutation
-
-    mutating func apply(_ delta: Decimal) {
-        balance += delta
     }
 }

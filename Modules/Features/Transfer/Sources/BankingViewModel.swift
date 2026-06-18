@@ -33,10 +33,14 @@ public final class BankingViewModel: BaseViewModel, ObservableObject {
         errorMessage = nil
         isLoading = true
 
+        // A fresh key per tap: this call is a new logical attempt, not a retry of a
+        // previous one, so it must not be deduplicated against anything earlier.
+        let idempotencyKey = UUID().uuidString
+
         Task {
             defer { isLoading = false }
             do {
-                try await transferUseCase.execute(from: from, to: to, amount: amount)
+                try await transferUseCase.execute(from: from, to: to, amount: amount, idempotencyKey: idempotencyKey)
             } catch {
                 errorMessage = error.localizedDescription
             }

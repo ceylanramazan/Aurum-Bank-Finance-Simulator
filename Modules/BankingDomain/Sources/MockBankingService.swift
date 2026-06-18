@@ -1,25 +1,26 @@
 import Foundation
 
-/// In-memory `BankingService` used for local simulation/demo purposes.
+/// `BankingService` implementation that delegates all persistence to injected stores.
 ///
-/// Implemented as an `actor` so every read and the transfer's read-validate-mutate sequence
-/// are serialized automatically by the Swift runtime — no manual locking, no data races on
-/// `users` / `accounts` / `transactions`, even under concurrent callers.
+/// `users` stays a plain in-memory array (no `UserStore` was asked for, and nothing mutates
+/// it). `accounts`/`transactions` go through `AccountStore`/`TransactionStore` instead of
+/// this actor's own state — see `AccountStore.transferBalance` for why the actual balance
+/// mutation has to be one atomic call into the store rather than separate fetch + update
+/// calls made from here.
 public actor MockBankingService: BankingService {
 
-    // MARK: - Storage
+    // MARK: - Dependencies
 
-    private var users: [User]
-    private var accounts: [Account]
-    private var transactions: [Transaction]
+    private let users: [User]
+    private let accountStore: AccountStore
+    private let transactionStore: TransactionStore
 
     // MARK: - Init
 
-    public init() {
-        let seed = Self.makeSeedData()
-        self.users = seed.users
-        self.accounts = seed.accounts
-        self.transactions = seed.transactions
+    public init(users: [User], accountStore: AccountStore, transactionStore: TransactionStore) {
+        self.users = users
+        self.accountStore = accountStore
+        self.transactionStore = transactionStore
     }
 
     // MARK: - BankingService — Queries
@@ -28,14 +29,12 @@ public actor MockBankingService: BankingService {
         users
     }
 
-    public func getAccounts(for userId: UUID) -> [Account] {
-        accounts.filter { $0.userId == userId }
+    public func getAccounts(for userId: UUID) async -> [Account] {
+        await accountStore.fetchAccounts(for: userId)
     }
 
-    public func getTransactions(for accountId: UUID) -> [Transaction] {
-        transactions
-            .filter { $0.fromAccountId == accountId || $0.toAccountId == accountId }
-            .sorted { $0.date > $1.date }
+    public func getTransactions(for accountId: UUID) async -> [Transaction] {
+        await transactionStore.fetchTransactions(for: accountId)
     }
 
     // MARK: - BankingService — Transfer
@@ -45,27 +44,20 @@ public actor MockBankingService: BankingService {
         to: UUID,
         amount: Decimal,
         description: String? = nil
-    ) throws {
+    ) async throws {
+        // Stateless checks first — fail fast before paying for an actor hop to the store.
         guard amount > 0 else {
             throw BankingError.invalidAmount
         }
         guard from != to else {
             throw BankingError.sameAccountTransfer
         }
-        guard let fromIndex = accounts.firstIndex(where: { $0.id == from }) else {
-            throw BankingError.accountNotFound
-        }
-        guard let toIndex = accounts.firstIndex(where: { $0.id == to }) else {
-            throw BankingError.accountNotFound
-        }
-        guard accounts[fromIndex].balance >= amount else {
-            throw BankingError.insufficientFunds
-        }
 
-        accounts[fromIndex].apply(-amount)
-        accounts[toIndex].apply(amount)
+        // Single atomic call: validates both accounts exist and the sender has sufficient
+        // funds, then mutates both balances, all without a suspension point in between.
+        try await accountStore.transferBalance(from: from, to: to, amount: amount)
 
-        transactions.append(
+        await transactionStore.save(
             Transaction(
                 fromAccountId: from,
                 toAccountId: to,
@@ -73,54 +65,6 @@ public actor MockBankingService: BankingService {
                 type: .transfer,
                 description: description
             )
-        )
-    }
-
-    // MARK: - Seed Data
-
-    private static func makeSeedData() -> (users: [User], accounts: [Account], transactions: [Transaction]) {
-        let alice = User(name: "Alice Yılmaz", type: .individual)
-        let acme = User(name: "Acme Corporation", type: .corporate)
-
-        let aliceChecking = Account(userId: alice.id, iban: "TR330006100519786457841326", balance: 5_000)
-        let aliceSavings = Account(userId: alice.id, iban: "TR330006100519786457841327", balance: 12_500)
-        let acmeOperating = Account(userId: acme.id, iban: "TR330006100519786457841328", balance: 250_000)
-        let acmePayroll = Account(userId: acme.id, iban: "TR330006100519786457841329", balance: 80_000)
-
-        let dayAgo = Date(timeIntervalSinceNow: -86_400)
-        let weekAgo = Date(timeIntervalSinceNow: -7 * 86_400)
-
-        let transactions = [
-            Transaction(
-                fromAccountId: aliceChecking.id,
-                toAccountId: aliceSavings.id,
-                amount: 500,
-                type: .transfer,
-                date: dayAgo,
-                description: "Move to savings"
-            ),
-            Transaction(
-                fromAccountId: acmeOperating.id,
-                toAccountId: acmePayroll.id,
-                amount: 15_000,
-                type: .transfer,
-                date: weekAgo,
-                description: "Monthly payroll funding"
-            ),
-            Transaction(
-                fromAccountId: aliceChecking.id,
-                toAccountId: acmeOperating.id,
-                amount: 250,
-                type: .transfer,
-                date: weekAgo,
-                description: "Invoice payment"
-            ),
-        ]
-
-        return (
-            users: [alice, acme],
-            accounts: [aliceChecking, aliceSavings, acmeOperating, acmePayroll],
-            transactions: transactions
         )
     }
 }

@@ -2,18 +2,15 @@ import XCTest
 import BankingDomain
 import BankingUseCases
 
-/// Proves that routing many concurrent transfers through one shared `MockBankingService`
-/// instance — exactly how `AppDependencyContainer` shares it app-wide — never corrupts the
-/// ledger. The actor serializes every `transfer` call internally, so this needs no manual
-/// locking at the use-case layer to be safe.
+/// Proves that routing many concurrent transfers — each with its own idempotency key —
+/// through one shared `MockBankingService` instance never corrupts the ledger.
 final class TransferUseCaseConcurrencyTests: XCTestCase {
 
     func test_concurrentTransfersThroughSharedService_neverCorruptBalances() async throws {
-        let bankingService = MockBankingService()
-        let useCase = TransferUseCase(bankingService: bankingService)
+        let stack = TestStack.make()
 
-        let users = await bankingService.getUsers()
-        let accounts = await bankingService.getAccounts(for: users[1].id) // Acme: 250_000 / 80_000
+        let users = await stack.bankingService.getUsers()
+        let accounts = await stack.bankingService.getAccounts(for: users[1].id) // Acme: 250_000 / 80_000
         let from = try XCTUnwrap(accounts.first)
         let to = try XCTUnwrap(accounts.last)
 
@@ -21,14 +18,14 @@ final class TransferUseCaseConcurrencyTests: XCTestCase {
         let amount: Decimal = 10
 
         await withTaskGroup(of: Void.self) { group in
-            for _ in 0..<transferCount {
+            for i in 0..<transferCount {
                 group.addTask {
-                    try? await useCase.execute(from: from.id, to: to.id, amount: amount)
+                    try? await stack.useCase.execute(from: from.id, to: to.id, amount: amount, idempotencyKey: "key-\(i)")
                 }
             }
         }
 
-        let updated = await bankingService.getAccounts(for: users[1].id)
+        let updated = await stack.bankingService.getAccounts(for: users[1].id)
         let updatedFrom = try XCTUnwrap(updated.first { $0.id == from.id })
         let updatedTo = try XCTUnwrap(updated.first { $0.id == to.id })
 
@@ -36,7 +33,7 @@ final class TransferUseCaseConcurrencyTests: XCTestCase {
         XCTAssertEqual(updatedFrom.balance, from.balance - expectedMoved)
         XCTAssertEqual(updatedTo.balance, to.balance + expectedMoved)
 
-        let transactions = await bankingService.getTransactions(for: from.id)
+        let transactions = await stack.bankingService.getTransactions(for: from.id)
         XCTAssertEqual(transactions.filter { $0.amount == amount }.count, transferCount)
     }
 }

@@ -26,6 +26,9 @@ let project = Project(
             sources: ["Tests/**"],
             dependencies: [
                 .target(name: "BankingUseCases"),
+                // Tests need concrete stores to assemble a full MockBankingService; the
+                // framework target itself only depends on the BankingDomain protocols.
+                .project(target: "Storage", path: "../Storage"),
             ]
         ),
     ]
