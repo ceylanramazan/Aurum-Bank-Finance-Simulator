@@ -2,6 +2,7 @@ import UIKit
 
 /// Default implementation of child-coordinator bookkeeping shared by every flow coordinator.
 /// Concrete coordinators subclass this and override `start()`.
+@MainActor
 open class BaseCoordinator: Coordinator {
 
     // MARK: - Coordinator

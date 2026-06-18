@@ -13,6 +13,7 @@ let workspace = Workspace(
         "Modules/DesignSystem",
         "Modules/Shared",
         "Modules/Features/Transfer",
+        "Modules/Features/Accounts",
         // Add each new feature module's path here as it's created, e.g. "Modules/Features/Onboarding".
     ]
 )

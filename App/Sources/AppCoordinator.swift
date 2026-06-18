@@ -1,8 +1,10 @@
 import UIKit
 import Core
+import Accounts
 
 /// Root coordinator: owns the app window and starts the first navigation flow.
-/// Until the first feature module exists, it shows a bare placeholder root screen.
+/// Accounts is the first real feature, so it's also the app's initial screen.
+@MainActor
 final class AppCoordinator: Coordinator {
 
     // MARK: - Coordinator
@@ -28,14 +30,17 @@ final class AppCoordinator: Coordinator {
     func start() {
         window.rootViewController = navigationController
         window.makeKeyAndVisible()
-        showRootPlaceholder()
+        showAccounts()
     }
 
     // MARK: - Private
 
-    private func showRootPlaceholder() {
-        let placeholder = UIViewController()
-        placeholder.view.backgroundColor = .systemBackground
-        navigationController.setViewControllers([placeholder], animated: false)
+    private func showAccounts() {
+        let accountsCoordinator = AccountsCoordinator(
+            navigationController: navigationController,
+            bankingService: dependencyContainer.makeBankingService()
+        )
+        childCoordinators.append(accountsCoordinator)
+        accountsCoordinator.start()
     }
 }

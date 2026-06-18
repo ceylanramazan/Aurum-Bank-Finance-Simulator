@@ -16,6 +16,7 @@ let project = Project(
                 .project(target: "Core", path: "../Modules/Core"),
                 .project(target: "BankingDomain", path: "../Modules/BankingDomain"),
                 .project(target: "BankingUseCases", path: "../Modules/BankingUseCases"),
+                .project(target: "Accounts", path: "../Modules/Features/Accounts"),
                 .project(target: "NetworkKit", path: "../Modules/NetworkKit"),
                 .project(target: "Storage", path: "../Modules/Storage"),
                 .project(target: "SecurityKit", path: "../Modules/SecurityKit"),
