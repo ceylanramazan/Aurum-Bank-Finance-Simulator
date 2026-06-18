@@ -14,6 +14,8 @@ let project = Project(
             resources: ["Resources/Assets.xcassets"],
             dependencies: [
                 .project(target: "Core", path: "../Modules/Core"),
+                .project(target: "BankingDomain", path: "../Modules/BankingDomain"),
+                .project(target: "BankingUseCases", path: "../Modules/BankingUseCases"),
                 .project(target: "NetworkKit", path: "../Modules/NetworkKit"),
                 .project(target: "Storage", path: "../Modules/Storage"),
                 .project(target: "SecurityKit", path: "../Modules/SecurityKit"),
